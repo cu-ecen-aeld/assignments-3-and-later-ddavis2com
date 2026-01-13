@@ -7,7 +7,7 @@ fi
 DIR="$(dirname ${1})"
 if [ ! -d ${DIR} ]
 then
-	mkdir ${DIR}
+	mkdir -p ${DIR}
 fi
 echo "${2}" > ${1}
 exit 0
