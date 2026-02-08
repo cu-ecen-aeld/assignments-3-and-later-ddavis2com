@@ -1,4 +1,8 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -17,7 +21,9 @@ bool do_system(const char *cmd)
  *   or false() if it returned a failure
 */
 
-    return true;
+    int result = system(cmd);
+
+    return result == 0;
 }
 
 /**
@@ -59,9 +65,22 @@ bool do_exec(int count, ...)
  *
 */
 
-    va_end(args);
-
-    return true;
+    pid_t pid = fork();
+    if (pid == 0) {
+        int result = execv(command[0], command);
+        if (result == -1) {
+            perror("execv failed");
+        }
+        exit(1);
+    } else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        va_end(args);
+        return WEXITSTATUS(status) == 0;
+    } else {
+        va_end(args);
+        return false;
+    }
 }
 
 /**
@@ -93,7 +112,33 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    va_end(args);
+    pid_t pid = fork();
+    if (pid == 0) {
+        int fd = open(outputfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd == -1) {
+            perror("open failed");
+            exit(1);
+        }
 
-    return true;
+        if (dup2(fd, STDOUT_FILENO) == -1) {
+            perror("dup2 failed");
+            close(fd);
+            exit(1);
+        }
+
+        close(fd);
+        int result = execv(command[0], command);
+        if (result == -1) {
+            perror("execv failed");
+        }
+        exit(1);
+    } else if (pid > 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        va_end(args);
+        return WEXITSTATUS(status) == 0;
+    } else {
+        va_end(args);
+        return false;
+    }
 }
